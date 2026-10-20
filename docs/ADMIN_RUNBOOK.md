@@ -630,7 +630,7 @@ CONTRACT_ID="$CONTRACT_ID" NETWORK="$NETWORK" \
 Soroban persistent entries expire unless their TTL is extended. A registry with inactive contributors will silently lose its cold entries if not maintained.
 
 ### When to run it
-Run the `ttl_keeper.sh` script periodically (e.g., weekly or monthly) to walk the entire registry and bump the TTL of every registered contributor.
+Run the `ttl_keeper.sh` script at least every ~20 days (`KEEPER_INTERVAL`, two-thirds of the 30-day `TTL_THRESHOLD`) to walk the entire registry and bump the TTL of every registered contributor. Follow the [operator playbook](STORAGE_RENT.md#operator-playbook-ttl-extension-issue-660) for sizing, dry-run, verification, and archived-entry recovery.
 
 ```bash
 # Preferred: the Makefile target, so contract id / source / network come from
