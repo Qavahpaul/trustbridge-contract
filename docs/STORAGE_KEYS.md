@@ -8,6 +8,75 @@ Related docs: [ARCHITECTURE](ARCHITECTURE.md) · [ABI](ABI.md) · [SECURITY](SEC
 
 ---
 
+## Key Namespace Diagram
+
+The contract uses **two independent storage partitions** in Soroban, each with distinct key namespaces:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Soroban Contract Storage                           │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+        ┌───────────▼──────────────┐   ┌───────────▼──────────────┐
+        │  Instance Storage        │   │ Persistent Storage (TTL) │
+        │  (single value per key)  │   │  (per-entry, versioned)  │
+        └──────────────────────────┘   └──────────────────────────┘
+                    │                               │
+         ┌──────────┴──────────┐       ┌────────────┴────────────┐
+         │                     │       │                         │
+    ┌────▼────────┐  ┌────────▼─┐  ┌──▼──────────┐  ┌──────────▼──┐
+    │ State Keys  │  │ Index    │  │Per-Username │  │Per-Address  │
+    │ (singleton) │  │ & Config │  │ Namespaces  │  │ Namespaces  │
+    └─────────────┘  └──────────┘  └─────────────┘  └─────────────┘
+         │                │              │                 │
+    ┌────┴─────┐     ┌────┴────┐    ┌────┴──────┐    ┌────┴──────┐
+    │ Counter  │     │Chunk    │    │(reg)      │    │(role)     │
+    │ Flags    │     │Config   │    │(lastact)  │    │(pendrole) │
+    │ Control  │     │Version  │    │(pendrot)  │    │(role_exp) │
+    │Admin     │     │Network  │    │(pend_rev) │    │(vfyrate)  │
+    │Transfer  │     │...      │    │(chllng)   │    └───────────┘
+    │Pause     │     │         │    │(vfy_at)   │
+    │Guardian  │     │         │    └───────────┘
+    │Roles     │     │         │
+    │...       │     │         │
+    └──────────┘     └─────────┘
+```
+
+### Collision Prevention Strategy
+
+1. **Partition Isolation**: Instance and persistent keys live in separate Soroban namespaces — no collision possible even if symbol names were duplicated across partitions.
+
+2. **Symbol Uniqueness**: Within each partition, all `Symbol` constants are distinct (verified by `scripts/check_storage_keys.sh`).
+
+3. **Tuple Discriminators**: Persistent keys use `(Symbol, Context)` tuples. The discriminator (first element) is encoded first in XDR serialization, so different discriminators create different keys regardless of context overlap:
+   - `(Symbol("reg"), "alice")` ≠ `(Symbol("chllng"), "alice")` ← different discriminators
+   - `(Symbol("role"), address_A)` ≠ `(Symbol("role"), address_B)` ← different contexts
+
+4. **Context Type Safety**: Different context types serialize differently:
+   - `String` (GitHub usernames) serializes with a length prefix and UTF-8 bytes
+   - `Address` (Stellar accounts) serializes as a fixed 32-byte account ID
+   - `u32` (chunk indices) serializes as a 4-byte integer
+   - These byte sequences never collide across namespaces even if values overlap
+
+### Adding a New Key
+
+When introducing a new storage key, **new contributors** should:
+
+1. **Choose a partition**: Instance (singleton, no TTL) or persistent (per-entry, TTL-managed)?
+2. **Pick a context type**: None (instance), or `String` (username), `Address` (account), `u32` (index), etc.?
+3. **Reserve a symbol**: Pick a short unique name (`symbol_short!("new_key")`).
+4. **Check collision-free**:
+   - Run `make storage-keys-check` to verify your constant is documented.
+   - If persistent, ensure your discriminator doesn't duplicate an existing one.
+   - If reusing a context type, review the namespace diagram above — your discriminator must differ from all others using that type.
+5. **Document** in the tables below and this diagram.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#storage-key-best-practices) for the full workflow.
+
+---
+
 ## Instance Storage (per contract instance)
 
 These keys live in Soroban's **instance** storage partition. Each key is a `Symbol` mapped to a single value.
