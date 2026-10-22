@@ -4488,3 +4488,71 @@ fn test_health_probes_uninitialized_reports_no_admin() {
         assert_eq!(probes.index_gen, 0);
     });
 }
+
+// ── Issue #491: export_attestation helper integration ───────────────────────
+
+#[test]
+fn test_integration_export_attestation_covers_registered_page() {
+    let (env, _admin, user1, user2, contract_id) = setup_test_env();
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || {
+        TrustBridgeContract::register(env.clone(), s(&env, "alice"), user1.clone(), Vec::new(&env))
+            .unwrap();
+        TrustBridgeContract::register(env.clone(), s(&env, "bob"), user2.clone(), Vec::new(&env))
+            .unwrap();
+
+        let att = TrustBridgeContract::export_attestation(env.clone(), None, 10).unwrap();
+        assert_eq!(att.page.records.len(), 2u32);
+        assert_eq!(att.page.total, 2u32);
+        assert_eq!(att.version.len(), 3u32);
+        assert_eq!(att.ledger, env.ledger().sequence());
+        assert!(
+            att.digest.to_array() != [0u8; 32],
+            "non-empty page must produce a non-zero export digest"
+        );
+    });
+}
+
+#[test]
+fn test_integration_export_attestation_empty_registry() {
+    let (env, _admin, _user1, _user2, contract_id) = setup_test_env();
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || {
+        let att = TrustBridgeContract::export_attestation(env.clone(), None, 10).unwrap();
+        assert_eq!(att.page.records.len(), 0u32);
+        assert_eq!(att.page.total, 0u32);
+        assert!(att.page.next_cursor.is_none());
+    });
+}
+
+#[test]
+fn test_integration_export_attestation_pagination_cursor() {
+    let (env, _admin, user1, user2, contract_id) = setup_test_env();
+    let user3 = Address::generate(&env);
+    env.mock_all_auths();
+    env.as_contract(&contract_id, || {
+        TrustBridgeContract::register(env.clone(), s(&env, "alice"), user1.clone(), Vec::new(&env))
+            .unwrap();
+        TrustBridgeContract::register(env.clone(), s(&env, "bob"), user2.clone(), Vec::new(&env))
+            .unwrap();
+        TrustBridgeContract::register(env.clone(), s(&env, "carol"), user3.clone(), Vec::new(&env))
+            .unwrap();
+    });
+    // One admin-authed export per frame: re-entering `export_attestation` in
+    // the same frame trips the host's existing-auth check.
+    let cursor = env.as_contract(&contract_id, || {
+        let first = TrustBridgeContract::export_attestation(env.clone(), None, 2).unwrap();
+        assert_eq!(first.page.records.len(), 2u32);
+        assert_eq!(first.page.total, 3u32);
+        assert!(
+            first.page.next_cursor.is_some(),
+            "limit 2 over 3 records must yield a cursor"
+        );
+        first.page.next_cursor.clone()
+    });
+    env.as_contract(&contract_id, || {
+        let second = TrustBridgeContract::export_attestation(env.clone(), cursor, 2).unwrap();
+        assert_eq!(second.page.records.len(), 1u32);
+        assert_eq!(second.page.total, 3u32);
+    });
+}
