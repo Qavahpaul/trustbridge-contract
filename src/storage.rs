@@ -744,6 +744,11 @@ pub fn extend_record_ttl(env: &Env, github_username: &String) -> bool {
 pub fn remove_record(env: &Env, github_username: &String) {
     let key = (REG_KEY, canon(env, github_username));
     env.storage().persistent().remove(&key);
+    // Issue #588: an outstanding re-verify flag lives under its own `pend_rev`
+    // prefix, so dropping the registration must drop it too — otherwise a
+    // later re-registration of the same name inherits a stale flag (see
+    // `docs/STORAGE_KEYS.md`).
+    clear_pending_reverify(env, github_username);
 }
 
 /// Existence check for a single registration.
@@ -1374,8 +1379,16 @@ pub fn get_pending_reverify(env: &Env, github_username: &String) -> bool {
 }
 
 pub fn set_pending_reverify(env: &Env, github_username: &String, flag: bool) {
-    let key = (PENDING_REVERIFY_KEY, canon(env, github_username));
-    env.storage().persistent().set(&key, &flag);
+    // A `false` flag is the absence of a pending re-verification, so it is
+    // stored as a removed key rather than as a persisted `false` — that keeps
+    // `has` consistent with `get_pending_reverify` and leaves no stale entry
+    // behind for a later re-registration to inherit (Issue #588).
+    if flag {
+        let key = (PENDING_REVERIFY_KEY, canon(env, github_username));
+        env.storage().persistent().set(&key, &true);
+    } else {
+        clear_pending_reverify(env, github_username);
+    }
 }
 
 pub fn clear_pending_reverify(env: &Env, github_username: &String) {
@@ -2895,6 +2908,63 @@ mod pending_reverify_tests {
                 .unwrap();
             assert!(!get_pending_reverify(&env, &old));
             assert!(get_pending_reverify(&env, &new));
+        });
+    }
+
+    /// Issue #588 edge case: `set_pending_reverify(.., false)` clears the flag
+    /// by removing the key — it must not persist a `false` entry, which would
+    /// make `has` disagree with `get_pending_reverify`.
+    #[test]
+    fn test_set_pending_reverify_false_removes_key() {
+        let env = Env::default();
+        let contract_id = setup(&env);
+        env.as_contract(&contract_id, || {
+            let octocat = name(&env, "octocat");
+            let key = (PENDING_REVERIFY_KEY, canon(&env, &octocat));
+
+            set_pending_reverify(&env, &octocat, true);
+            assert!(env.storage().persistent().has(&key));
+
+            set_pending_reverify(&env, &octocat, false);
+            assert!(!get_pending_reverify(&env, &octocat));
+            assert!(!env.storage().persistent().has(&key));
+        });
+    }
+
+    /// Issue #588 edge case: setting the flag does not require the username to
+    /// be registered — the key is written straight through and stays readable.
+    #[test]
+    fn test_set_pending_reverify_on_unknown_username_is_allowed() {
+        let env = Env::default();
+        let contract_id = setup(&env);
+        env.as_contract(&contract_id, || {
+            let ghost = name(&env, "ghost");
+            set_pending_reverify(&env, &ghost, true);
+            assert!(get_pending_reverify(&env, &ghost));
+        });
+    }
+
+    /// Both directions are idempotent: repeating a write never changes the
+    /// observable state, and repeated clears are safe no-ops.
+    #[test]
+    fn test_pending_reverify_writes_are_idempotent() {
+        let env = Env::default();
+        let contract_id = setup(&env);
+        env.as_contract(&contract_id, || {
+            let octocat = name(&env, "octocat");
+            let key = (PENDING_REVERIFY_KEY, canon(&env, &octocat));
+
+            set_pending_reverify(&env, &octocat, true);
+            set_pending_reverify(&env, &octocat, true);
+            assert!(get_pending_reverify(&env, &octocat));
+
+            set_pending_reverify(&env, &octocat, false);
+            let removed = !env.storage().persistent().has(&key);
+            set_pending_reverify(&env, &octocat, false);
+            clear_pending_reverify(&env, &octocat);
+            assert!(!get_pending_reverify(&env, &octocat));
+            assert!(removed, "first false write must have removed the key");
+            assert!(!env.storage().persistent().has(&key));
         });
     }
 }
