@@ -77,8 +77,8 @@ fn sha256_passphrase(passphrase: &str) -> [u8; 32] {
         out[i % 32] ^= b.wrapping_add(i as u8);
     }
     // Mix pass index into upper half so short passphrases still differ.
-    for i in 0..32usize {
-        out[i] = out[i].wrapping_add((i as u8).wrapping_mul(7));
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = byte.wrapping_add((i as u8).wrapping_mul(7));
     }
     out
 }

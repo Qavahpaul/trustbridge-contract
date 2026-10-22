@@ -39,6 +39,8 @@ pub const PAUSED_KEY: Symbol = symbol_short!("pause");
 /// Last `PauseReason` recorded by `pause` / `unpause`.
 pub const PAUSE_RSN_KEY: Symbol = symbol_short!("pause_rsn");
 /// Consolidated alias for [`PAUSE_RSN_KEY`].
+#[allow(dead_code)] // Issue #211: alias retained for callers that spell out the key name;
+                    // PAUSE_RSN_KEY is the canonical persisted key.
 pub const PAUSE_REASON_KEY: Symbol = PAUSE_RSN_KEY;
 pub const COOLDOWN_KEY: Symbol = symbol_short!("cdown");
 /// Seconds a requested address rotation must wait before it can execute
@@ -140,6 +142,7 @@ pub const MAX_FALLBACK_ADDRESSES: u32 = 5;
 pub const VERSION_KEY: Symbol = VER_KEY;
 
 /// Key for a pending admin transfer proposal (Issue #195).
+#[allow(dead_code)] // Issue #195: consumed by the timelocked admin-transfer propose/execute flow.
 pub const ADMIN_TRANSFER_KEY: Symbol = symbol_short!("adm_xfr");
 
 /// Key for whether WASM attestation is required before upgrade (Issue #198).
@@ -445,9 +448,13 @@ pub struct Stats {
 
 /// Documented layout version for [`ExportPage`] and its records.
 /// Breaking changes to the struct layout or field ordering bump this version.
+#[allow(dead_code)] // Public ABI constant consumed by off-chain clients (see docs/ABI.md),
+                    // not read inside the contract.
 pub const EXPORT_PAGE_LAYOUT_VERSION: u32 = 2;
 
 /// A single exported record tuple: `(github_username, ContributorRecord)`.
+#[allow(dead_code)] // Public ABI type alias consumed by off-chain clients; see
+                    // `EXPORT_PAGE_LAYOUT_VERSION` and `ts-differential-tests/export_page.*`.
 pub type ExportRecord = (String, ContributorRecord);
 
 /// A single page of registry records returned by paginated export functions.
@@ -654,6 +661,8 @@ pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
 }
 
 /// Write `admin` into instance storage. Used only by `initialize`.
+#[allow(dead_code)] // Issue #248: `initialize` writes ADMIN_KEY directly; this helper is
+                    // exercised by `storage_dead_code_tests::setup_contract`.
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&ADMIN_KEY, admin);
 }
@@ -1297,6 +1306,8 @@ pub fn set_emergency_pause_ts(env: &Env, ts: u64) {
 }
 
 /// Rejects the call while the emergency pause flag is set.
+#[allow(dead_code)] // Staged for the emergency-pause call-site consolidation; not yet invoked
+                    // by an entry point. Covered by `storage_dead_code_tests`.
 pub fn require_not_emergency_paused(env: &Env) -> Result<(), ContractError> {
     if get_emergency_pause(env) {
         Err(ContractError::Paused)
@@ -1452,16 +1463,19 @@ pub fn remove_wasm_attestation(env: &Env) {
 // ── Admin transfer (Issue #195) ───────────────────────────────────────────────
 
 /// Returns the pending admin transfer proposal, if one exists.
+#[allow(dead_code)] // Issue #195: used by the timelocked admin-transfer propose/execute flow.
 pub fn get_admin_transfer(env: &Env) -> Option<AdminTransferProposal> {
     env.storage().instance().get(&ADMIN_TRANSFER_KEY)
 }
 
 /// Stores a new admin transfer proposal, overwriting any existing one.
+#[allow(dead_code)] // Issue #195: used by the timelocked admin-transfer propose/execute flow.
 pub fn set_admin_transfer(env: &Env, proposal: &AdminTransferProposal) {
     env.storage().instance().set(&ADMIN_TRANSFER_KEY, proposal);
 }
 
 /// Removes the pending admin transfer proposal.
+#[allow(dead_code)] // Issue #195: used by the timelocked admin-transfer cancel/execute flow.
 pub fn clear_admin_transfer(env: &Env) {
     env.storage().instance().remove(&ADMIN_TRANSFER_KEY);
 }
@@ -1613,6 +1627,8 @@ pub fn charge_verify_rate(env: &Env, verifier: &Address, units: u32) -> Result<(
 
 /// Units `verifier` has already spent in the current ledger (0 after rollover).
 /// Read-only helper for tests and diagnostics.
+#[allow(dead_code)] // Diagnostics/test helper: not called from an entry point; covered by
+                    // the rate-limit tests in this module.
 pub fn verify_units_spent(env: &Env, verifier: &Address) -> u32 {
     let key = (VERIFY_RATE_KEY, verifier.clone());
     match env.storage().persistent().get::<_, (u32, u32)>(&key) {

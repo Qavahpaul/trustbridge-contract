@@ -245,7 +245,6 @@ fn test_extend_registry_ttl_batch_size_one() {
 fn test_extend_registry_ttl_is_permissionless() {
     let (env, _admin, contract_id) = setup();
     let user = Address::generate(&env);
-    let random_caller = Address::generate(&env);
 
     register_user(&env, &contract_id, "alice", &user);
 
@@ -268,7 +267,7 @@ fn test_extend_registry_ttl_is_permissionless() {
 /// and the keeper must be able to extend TTL during a maintenance window.
 #[test]
 fn test_extend_registry_ttl_works_while_paused() {
-    let (env, admin, contract_id) = setup();
+    let (env, _admin, contract_id) = setup();
     let user = Address::generate(&env);
 
     register_user(&env, &contract_id, "alice", &user);
@@ -566,10 +565,12 @@ fn test_extend_registry_ttl_coverage_complete() {
     const EXPECTED_TEST_COUNT: usize = 25;
 
     // The real validation is in each individual test. This documents the scope.
-    assert!(
-        EXPECTED_TEST_COUNT >= 24,
-        "Test suite should have at least 24 dedicated tests for extend_registry_ttl"
-    );
+    const {
+        assert!(
+            EXPECTED_TEST_COUNT >= 24,
+            "Test suite should have at least 24 dedicated tests for extend_registry_ttl"
+        );
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
