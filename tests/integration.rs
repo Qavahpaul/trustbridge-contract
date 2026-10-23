@@ -16,8 +16,8 @@ use soroban_sdk::{
 };
 
 use trustbridge_contract::{
-    AuditEventType, AuditLogEntry, BatchConfig, ContractError, Role, RoleGrantCancelledEvent,
-    RoleGrantPendingEvent, TrustBridgeContract, VerifierAllowEntry, MAX_VERIFIERS, MAX_WRITE_BATCH,
+    BatchConfig, ContractError, Role, TrustBridgeContract, VerifierAllowEntry, MAX_VERIFIERS,
+    MAX_WRITE_BATCH,
 };
 
 fn setup_test_env() -> (Env, Address, Address, Address, Address) {
@@ -164,7 +164,7 @@ fn test_integration_guardian_pause_is_allowed_for_admin_or_guardian() {
 
 #[test]
 fn test_integration_emergency_pause_blocks_verify_and_clears() {
-    let (env, admin, user1, _user2, contract_id) = setup_test_env();
+    let (env, _admin, user1, _user2, contract_id) = setup_test_env();
     let guardian = Address::generate(&env);
 
     env.mock_all_auths();
@@ -235,6 +235,10 @@ fn test_integration_public_page_redacts_unverified_addresses() {
     env.mock_all_auths();
     env.as_contract(&contract_id, || {
         let page = TrustBridgeContract::get_public_paginated(env.clone(), None, 10).unwrap();
+        // `soroban_sdk::String` keys carry an `Env` handle, so clippy's
+        // `mutable_key_type` fires on maps keyed by them; the key is only ever
+        // read here.
+        #[allow(clippy::mutable_key_type)]
         let mut by_name: std::collections::BTreeMap<String, _> = page.records.into_iter().collect();
         // Total must include both registrations.
         assert_eq!(page.total, 2);
@@ -3264,7 +3268,7 @@ fn test_conformance_public_reads_available_while_paused() {
 /// conformance set (Issue #294).
 #[test]
 fn test_conformance_admin_reads_while_paused_need_auth_not_pause() {
-    let (env, admin, user1, _user2, contract_id) = setup_test_env();
+    let (env, _admin, user1, _user2, contract_id) = setup_test_env();
 
     env.mock_all_auths();
     env.as_contract(&contract_id, || {
@@ -3327,7 +3331,7 @@ fn test_issue306_remove_compact_reregister_counter_parity() {
                 TrustBridgeContract::get_registered_paginated(env.clone(), cursor.clone(), 100)
                     .unwrap();
             pages += 1;
-            seen += page.records.len() as u32;
+            seen += page.records.len();
             if !page.has_more {
                 break;
             }
@@ -3372,7 +3376,7 @@ fn test_issue306_remove_compact_reregister_counter_parity() {
         }
     });
 
-    let expected_after_remove = N - removed.len() as u32;
+    let expected_after_remove = N - removed.len();
 
     // 2. Compact the sparse index densely.
     env.mock_all_auths();
@@ -3456,7 +3460,7 @@ fn test_issue306_remove_compact_reregister_counter_parity() {
             let page =
                 TrustBridgeContract::get_registered_paginated(env.clone(), cursor.clone(), 100)
                     .unwrap();
-            let page_size = page.records.len() as u32;
+            let page_size = page.records.len();
             seen += page_size;
             if !page.has_more {
                 break;
@@ -3464,7 +3468,7 @@ fn test_issue306_remove_compact_reregister_counter_parity() {
             cursor = page.next_cursor.clone();
         }
         assert_eq!(seen, stats.total, "paginated walk must visit every record");
-        assert_eq!(seen, all.len() as u32);
+        assert_eq!(seen, all.len());
     });
 }
 

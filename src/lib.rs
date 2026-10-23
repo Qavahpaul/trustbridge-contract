@@ -90,24 +90,22 @@ use crate::storage::{
     get_role_holder_count as storage_get_role_holder_count, get_role_holders_internal,
     get_rotation_delay as storage_get_rotation_delay, get_stats as read_stats,
     get_verification_config, get_verified_count as storage_get_verified_count,
-    get_verifier_allowlist, get_verify_limit, get_verify_limit as storage_get_verify_limit,
-    get_version as storage_get_version, get_wasm_attestation, get_wasm_provenance, has_challenge,
-    has_pending_rotation, has_record, is_active_verifier as storage_is_active_verifier,
-    is_admin_caller, is_attestation_required, is_guardian, is_in_cooldown,
-    is_paused as storage_is_paused, prune_expired_verifiers, push_audit_entry, remove_challenge,
-    remove_from_index, remove_guardian as storage_remove_guardian, remove_pending_role,
-    remove_pending_rotation, remove_record, remove_role as storage_remove_role,
-    remove_verifier as storage_remove_verifier, remove_wasm_attestation,
-    require_attestation_if_required, require_initialized, require_not_paused,
-    require_role_not_expired, run_migration_steps, set_audit_config as storage_set_audit_config,
-    set_challenge, set_cooldown as storage_set_cooldown, set_count, set_emergency_pause,
-    set_emergency_pause_ts, set_ever_verified_count, set_guardian_address, set_last_action,
-    set_last_event_ledger, set_last_upgrade, set_network_id, set_paused as set_paused_state,
-    set_pending_reverify, set_pending_role, set_pending_rotation, set_record,
-    set_role as storage_set_role, set_role_delay as storage_set_role_delay,
-    set_rotation_delay as storage_set_rotation_delay, set_verified_count, set_verify_limit,
-    set_verify_limit as storage_set_verify_limit, set_version, set_wasm_attestation,
-    set_wasm_provenance, verifier_allowlist_active, verifier_slots_remaining,
+    get_verifier_allowlist, get_verify_limit, get_version as storage_get_version,
+    get_wasm_attestation, get_wasm_provenance, has_challenge, has_pending_rotation, has_record,
+    is_active_verifier as storage_is_active_verifier, is_admin_caller, is_attestation_required,
+    is_guardian, is_in_cooldown, is_paused as storage_is_paused, prune_expired_verifiers,
+    push_audit_entry, remove_challenge, remove_from_index,
+    remove_guardian as storage_remove_guardian, remove_pending_role, remove_pending_rotation,
+    remove_record, remove_role as storage_remove_role, remove_verifier as storage_remove_verifier,
+    remove_wasm_attestation, require_initialized, require_not_paused, require_role_not_expired,
+    run_migration_steps, set_audit_config as storage_set_audit_config, set_challenge,
+    set_cooldown as storage_set_cooldown, set_count, set_emergency_pause, set_emergency_pause_ts,
+    set_ever_verified_count, set_guardian_address, set_last_action, set_last_event_ledger,
+    set_last_upgrade, set_network_id, set_paused as set_paused_state, set_pending_reverify,
+    set_pending_role, set_pending_rotation, set_record, set_role as storage_set_role,
+    set_role_delay as storage_set_role_delay, set_rotation_delay as storage_set_rotation_delay,
+    set_verified_count, set_verify_limit, set_version, set_wasm_attestation, set_wasm_provenance,
+    verifier_allowlist_active, verifier_slots_remaining,
     PendingRoleGrant as PendingRoleGrantRecord, ADMIN_KEY, DEFAULT_CHALLENGE_DELAY_SECS,
 };
 
@@ -4369,11 +4367,7 @@ impl TrustBridgeContract {
         let cooldown_remaining_secs = if cooldown_secs > 0 {
             let last_upg = get_last_upgrade(&env);
             let next_allowed = last_upg.saturating_add(cooldown_secs);
-            if now < next_allowed {
-                next_allowed - now
-            } else {
-                0
-            }
+            next_allowed.saturating_sub(now)
         } else {
             0
         };
@@ -9025,7 +9019,7 @@ mod test {
         env.mock_all_auths();
         env.cost_estimate().budget().reset_default();
         env.as_contract(&contract_id, || {
-            TrustBridgeContract::register(env.clone(), github_username, user, Vec::new(&env))
+            TrustBridgeContract::register(env.clone(), github_username, user, Vec::new(env))
                 .unwrap();
         });
 
@@ -11170,7 +11164,7 @@ mod test {
     #[test]
     fn test_set_paused_true_emits_paused_event() {
         let env = Env::default();
-        let (admin, _user, _other, contract_id) = setup(&env);
+        let (_admin, _user, _other, contract_id) = setup(&env);
         env.mock_all_auths();
         env.as_contract(&contract_id, || {
             TrustBridgeContract::set_paused(env.clone(), true, 1).unwrap();
@@ -11189,7 +11183,7 @@ mod test {
     #[test]
     fn test_set_paused_false_emits_unpaused_event() {
         let env = Env::default();
-        let (admin, _user, _other, contract_id) = setup(&env);
+        let (_admin, _user, _other, contract_id) = setup(&env);
         env.mock_all_auths();
         env.as_contract(&contract_id, || {
             // First pause, then unpause via set_paused
@@ -11466,6 +11460,16 @@ mod test {
         let env = Env::default();
         let (_admin, _user, _other, contract_id) = setup(&env);
 
+        // Registering several chunks' worth of users in a single `Env` trips
+        // both the test budget and the mainnet invocation resource limits long
+        // before it trips anything the assertions below care about. The
+        // property under test — `has_record` / `get_address` resolving by
+        // direct persistent key rather than by scanning the chunked index — is
+        // independent of those harness limits, so both are lifted here (same
+        // rationale as `test_paginated_export_at_max_page_limit`).
+        env.cost_estimate().budget().reset_unlimited();
+        env.cost_estimate().disable_resource_limits();
+
         // Enough users to fill several chunks (CHUNK_SIZE == 50).
         const N: u32 = 260;
 
@@ -11547,7 +11551,7 @@ mod test {
     const FUZZ_SEED_CORPUS: &str = include_str!("../tests/fuzz/seeds.txt");
 
     fn parse_fuzz_seeds(text: &str) -> std::vec::Vec<u64> {
-        text.split(|c: char| c == '\n' || c == ',')
+        text.split(['\n', ','])
             .map(|l| l.split('#').next().unwrap_or("").trim())
             .filter(|l| !l.is_empty())
             .map(|l| {
@@ -11710,7 +11714,7 @@ mod test {
                             env.clone(),
                             username(env, name),
                             addr.clone(),
-                            Vec::new(&env),
+                            Vec::new(env),
                         )
                     });
                     if result.is_ok() {

@@ -215,7 +215,7 @@ fn test_registering_more_after_a_cursor_is_issued_does_not_invalidate_it() {
         register_range(&env, 3, 2);
 
         let page2 = TrustBridgeContract::get_registered_paginated(env.clone(), cursor, 10).unwrap();
-        assert!(page2.records.len() >= 1);
+        assert!(!page2.records.is_empty());
     });
 }
 
@@ -351,7 +351,7 @@ fn test_soak_valid_cursor_prologue() {
                     limit.min(max_limit)
                 };
                 assert_eq!(
-                    page.records.len() as u32,
+                    page.records.len(),
                     (total - offset).min(effective),
                     "offset {offset} limit {limit}"
                 );
@@ -433,7 +433,7 @@ fn test_soak_export_cursor_decode_never_panics() {
                             limit.min(max_limit)
                         };
                         assert_eq!(
-                            page.records.len() as u32,
+                            page.records.len(),
                             (total - offset).min(effective),
                             "seed {si} iter {i}: bounded page contents"
                         );

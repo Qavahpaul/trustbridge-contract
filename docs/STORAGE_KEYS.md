@@ -109,6 +109,7 @@ These keys live in Soroban's **instance** storage partition. Each key is a `Symb
 | `"attest"` | `ATTEST_KEY` | `Option<WasmAttestation>` | Pending upgrade attestation (Wave #24) |
 | `"adt_log"` | `AUDIT_LOG_KEY` | `Vec<AuditLogEntry>` | Audit log entries (Issue #217) |
 | `"adt_stat"` | `AUDIT_STATS_KEY` | `AuditStats` | Audit statistics aggregator |
+| `"adt_cfg"` | `AUDIT_CONFIG_KEY` | `Option<AuditConfig>` | Admin-tunable audit configuration (Issue #412). Absent until an admin calls `set_audit_config`, in which case callers fall back to `AuditConfig::default()` |
 | `"reserved"` | `RESERVED_KEY` | `Vec<String>` | Reserved username list (Issue #213) |
 | `"adm_xfr"` | `ADMIN_TRANSFER_KEY` | `Option<AdminTransferProposal>` | Pending admin transfer proposal (Issue #195) |
 | `"att_req"` | `ATTEST_REQUIRED_KEY` | `bool` | Whether WASM attestation is required before upgrade (Issue #198). Default `false`. Set via `set_attestation_required(caller, bool)` (admin-only); read via `get_attestation_required()` (public). When `true`, `upgrade` and the staged-WASM path fail with `AttestationRequired` if no valid attestation is present. `clear_attestation` does **not** clear this flag. |
@@ -226,6 +227,7 @@ numbers are informational and are not linted.
 | `"adt_log"` | `AUDIT_LOG_KEY` | 117 | Key for audit log entries list. Ring buffer capped at `MAX_AUDIT_LOG_ENTRIES` (100): `push_audit_entry` evicts the oldest (`pop_front`) on overflow; `AuditConfig.max_events` (default 1000, Issue #412) is the admin-tunable retention target and is not yet wired as the storage cap. |
 | `"adt_stat"` | `AUDIT_STATS_KEY` | 119 | Key for audit stats. |
 | `"chllng"` | `CHALLENGE_KEY` | 121 | Key prefix for per-username challenge records (Issue #214). |
+| `"adt_cfg"` | `AUDIT_CONFIG_KEY` | 123 | Key for the persisted `AuditConfig` (Issue #412). Absent means no config has been written, so callers use `AuditConfig::default()`. |
 | `"pause_rsn"` | `PAUSE_RSN_KEY` / `PAUSE_REASON_KEY` | 127 | Key for the pause reason code (Issue #211). |
 | `"reserved"` | `RESERVED_KEY` | 130 | Key for the reserved username set (Issue #213). |
 | alias of `VER_KEY` | `VERSION_KEY` | 141 | Key for the version stored at `storage::get_version` / `set_version` |

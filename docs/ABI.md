@@ -484,8 +484,8 @@ before committing a correction.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `stored_total` | `u32` | Value of `count` read from instance storage |
-| `recomputed_total` | `u32` | Value recomputed by walking the index |
+| `stored_count` | `u32` | Value of `count` read from instance storage |
+| `recomputed_count` | `u32` | Value recomputed by walking the index |
 | `stored_verified` | `u32` | Value of `verified` read from instance storage |
 | `recomputed_verified` | `u32` | Value recomputed by counting `verified = true` records |
 | `drifted` | `bool` | `true` when either counter differed from its recomputed value |

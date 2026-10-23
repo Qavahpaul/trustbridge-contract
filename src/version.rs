@@ -133,6 +133,9 @@ impl core::fmt::Display for Version {
 }
 
 /// Contract migration state.
+#[allow(dead_code)]
+// Staged migration-state machine; exercised by the tests in this file,
+// wired into `run_migration_steps` in a follow-up.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MigrationState {
     /// No migration needed
@@ -148,6 +151,9 @@ pub enum MigrationState {
 }
 
 /// Compatibility information between versions.
+#[allow(dead_code)]
+// Staged version-compatibility report; constructed by `for_upgrade` and
+// covered by the tests in this file.
 #[derive(Clone, Copy, Debug)]
 pub struct CompatibilityInfo {
     pub current_version: Version,
@@ -159,6 +165,7 @@ pub struct CompatibilityInfo {
 
 impl CompatibilityInfo {
     /// Create compatibility info for an upgrade.
+    #[allow(dead_code)] // Staged with `CompatibilityInfo`; covered by the tests in this file.
     pub fn for_upgrade(current: Version, target: Version) -> Self {
         let breaking_changes = current.major != target.major;
         let data_migration_required = breaking_changes || current.minor != target.minor;

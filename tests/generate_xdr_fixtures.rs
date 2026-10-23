@@ -30,10 +30,7 @@ use soroban_sdk::{
     testutils::{Address as _, Events as _},
     Address, Env, String, Symbol, TryFromVal, Vec,
 };
-use trustbridge_contract::{
-    BatchRemoveCancelledEvent, BatchRemoveExecutedEvent, BatchRemoveProposedEvent, Role,
-    TrustBridgeContract,
-};
+use trustbridge_contract::{Role, TrustBridgeContract};
 
 fn s(env: &Env, text: &str) -> String {
     String::from_str(env, text)

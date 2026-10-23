@@ -28,7 +28,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _, LedgerInfo},
     Address, Env, Vec,
 };
-use trustbridge_contract::{ContractError, Role, TrustBridgeContract};
+use trustbridge_contract::TrustBridgeContract;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ fn test_proof_for_registered_unverified_username() {
     // registered_at is set to env.ledger().timestamp() at registration time —
     // it may be 0 in a default Env where timestamp starts at 0, so we just
     // verify the field is present and the proof is self-consistent.
-    assert_eq!(proof.exists, true);
+    assert!(proof.exists);
 }
 
 // ─── 3. Verified existence proof ─────────────────────────────────────────────
